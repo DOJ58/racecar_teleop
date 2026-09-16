@@ -2,10 +2,12 @@
 
 Two modes, selected by the ``use_joy`` launch argument:
 
-  * ``use_joy:=true``  (default) — also launch the ``joy`` driver, with a
-    nonzero ``autorepeat_rate`` (joy's default 0.0 publishes only on change,
-    which silences /joy during steady inputs and spuriously trips the 0.3 s
-    input timeout).
+  * ``use_joy:=true``  (default) — also launch the ``joy`` driver with an
+    explicit ``autorepeat_rate``.  Humble's joy 3.3.0 already defaults to
+    20.0, but 0.0 would mean publish-only-on-change (the ROS 1 joy and
+    joy_linux default), which would trip the 0.3 s input timeout while
+    driving with steady inputs — so pin it instead of relying on the
+    driver/version default.
   * ``use_joy:=false`` — launch ONLY the mapping node, so a separate simulated
     ``/joy`` publisher can feed it (avoids two publishers on the same topic).
 """
@@ -32,18 +34,18 @@ def generate_launch_description():
             description='Launch the joy driver node in addition to teleop'),
         DeclareLaunchArgument(
             'joy_autorepeat_rate', default_value='20.0',
-            description='joy_node autorepeat rate in Hz. joy defaults to 0.0 '
-                        '(publish only on change), which does NOT satisfy the '
-                        '<0.3 s /joy gap this package requires; keep well '
-                        'above 1/input_timeout (~3.3 Hz). joy caps it at '
-                        '1000.0. 20.0 matches publish_rate and the e2e '
-                        'injection rate.'),
+            description='joy_node autorepeat rate in Hz. joy (Humble, 3.3.0) '
+                        'already defaults to 20.0 and republishes only on '
+                        'change when set to 0.0 (the ROS 1 joy / joy_linux '
+                        'default), which violates the <0.3 s /joy gap this '
+                        'package requires — hence pinned explicitly. Keep '
+                        'well above 1/input_timeout (~3.3 Hz); joy caps it '
+                        'at 1000.0.'),
         Node(
             package='joy', executable='joy_node', name='joy_node',
             output='screen',
-            # See joy_autorepeat_rate above: without an explicit nonzero rate
-            # the default event-driven /joy stream trips the input timeout on
-            # perfectly steady (connected, driving) inputs.
+            # Pin autorepeat_rate explicitly (see joy_autorepeat_rate above)
+            # so the <0.3 s /joy gap never depends on driver/version defaults.
             parameters=[{
                 'autorepeat_rate': ParameterValue(
                     LaunchConfiguration('joy_autorepeat_rate'), value_type=float),
